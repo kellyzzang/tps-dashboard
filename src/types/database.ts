@@ -29,7 +29,24 @@ export interface Product {
   selection_count: number
   last_selected_year: number | null
   last_selected_month: number | null
+  // 수수료 시트 연동
+  commission_key: string | null
+  commission_channel: string | null
   created_at: string
+  updated_at: string
+}
+
+export interface CommissionHistory {
+  id: string
+  commission_key: string
+  channel: string
+  brand: string
+  item_type: string
+  current_commission: number
+  daily_change: string
+  max_commission: number
+  min_commission: number
+  history: Record<string, number>
   updated_at: string
 }
 
@@ -77,6 +94,19 @@ export interface SurveyResult {
   notes: string | null
   created_at: string
   updated_at: string
+}
+
+export interface SurveyComparison {
+  id: string
+  monthly_survey_id: string
+  category: 'tps' | 'appliance'
+  telecom: string | null
+  brand: string | null
+  product_name: string
+  competitor_name: string
+  easytask_diff: number | null
+  realcontact_diff: number | null
+  created_at: string
 }
 
 // ── 상수 ──────────────────────────────────────────────────────────────────────

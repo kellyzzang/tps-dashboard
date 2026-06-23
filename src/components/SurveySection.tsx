@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 
 interface SurveyWithOrders extends MonthlySurvey {
   survey_orders: SurveyOrder[]
+  survey_items: { id: string; category: string }[]
 }
 
 function formatKRW(n: number) {
@@ -422,18 +423,50 @@ export function SurveySection({ initialSurveys }: { initialSurveys: SurveyWithOr
                 {/* 카드 헤더 */}
                 <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
                   <h3 className="font-semibold text-gray-900">{monthLabel(survey.year, survey.month)}</h3>
-                  <span
-                    className={`text-xs px-2.5 py-1 rounded-full font-medium ${
-                      allPaid
-                        ? 'bg-green-100 text-green-700'
-                        : somePending
-                        ? 'bg-orange-100 text-orange-700'
-                        : 'bg-gray-100 text-gray-500'
-                    }`}
-                  >
-                    {allPaid ? '정산 완료' : '정산 진행중'}
-                  </span>
+                  <div className="flex items-center gap-3">
+                    <span
+                      className={`text-xs px-2.5 py-1 rounded-full font-medium ${
+                        allPaid
+                          ? 'bg-green-100 text-green-700'
+                          : somePending
+                          ? 'bg-orange-100 text-orange-700'
+                          : 'bg-gray-100 text-gray-500'
+                      }`}
+                    >
+                      {allPaid ? '정산 완료' : '정산 진행중'}
+                    </span>
+                  </div>
                 </div>
+
+                {/* 상품 선정 현황 */}
+                {(() => {
+                  const items = survey.survey_items ?? []
+                  const tpsCount = items.filter(i => i.category === 'tps').length
+                  const usimCount = items.filter(i => i.category === 'usim').length
+                  const applianceCount = items.filter(i => i.category === 'appliance').length
+                  return (
+                    <div className="px-5 py-2.5 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between">
+                      <div className="text-xs text-gray-500">
+                        {items.length > 0 ? (
+                          <>
+                            <span className="font-medium text-gray-700">조사 상품</span>
+                            <span className="ml-2 text-gray-400">
+                              TPS {tpsCount} · 유심 {usimCount} · 가전 {applianceCount}개
+                            </span>
+                          </>
+                        ) : (
+                          <span className="text-orange-500">조사 상품이 선정되지 않았습니다</span>
+                        )}
+                      </div>
+                      <a
+                        href={`/surveys/${survey.id}/select`}
+                        className="text-xs text-blue-600 hover:underline font-medium"
+                      >
+                        {items.length > 0 ? '수정 →' : '상품 선정하기 →'}
+                      </a>
+                    </div>
+                  )
+                })()}
 
                 {/* 업체 카드들 */}
                 <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">

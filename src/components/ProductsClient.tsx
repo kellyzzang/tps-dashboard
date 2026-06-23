@@ -56,11 +56,22 @@ function ProductModal({
     commission: initial.commission ?? 0,
     bad_debt: initial.bad_debt ?? 0,
     score: initial.score ?? 50,
+    commission_key: initial.commission_key ?? '',
+    commission_channel: initial.commission_channel ?? '백메가',
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
   const set = (k: keyof typeof form, v: unknown) => setForm(f => ({ ...f, [k]: v }))
+
+  function setCommission(value: number) {
+    setForm(f => ({
+      ...f,
+      commission: value,
+      bad_debt: Math.round(value * 0.05),
+    }))
+  }
+
   const room = form.commission - form.our_subsidy - form.bad_debt
 
   async function handleSave() {
@@ -80,6 +91,8 @@ function ProductModal({
       payload.product_type = form.category === 'tps' ? form.product_type : null
       payload.has_usim_bundle = form.category === 'tps' && form.product_type.includes('유심')
       payload.usim_product = payload.has_usim_bundle ? form.usim_product || null : null
+      payload.commission_key = form.commission_key || null
+      payload.commission_channel = form.commission_key ? (form.commission_channel || '백메가') : null
     }
     if (form.category === 'appliance') {
       payload.appliance_category = form.appliance_category
@@ -157,6 +170,23 @@ function ProductModal({
                   />
                 </div>
               )}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">수수료 키값</label>
+                  <input value={form.commission_key} onChange={e => set('commission_key', e.target.value)}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    placeholder="예: LGU100Mbps인"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">접수처</label>
+                  <select value={form.commission_channel} onChange={e => set('commission_channel', e.target.value)}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+                    <option value="백메가">백메가</option>
+                    <option value="드림네트웍스">드림네트웍스</option>
+                  </select>
+                </div>
+              </div>
             </>
           )}
 
@@ -207,10 +237,10 @@ function ProductModal({
           {/* 공통: 지원금 정보 */}
           <div className="border-t border-gray-100 pt-4">
             <p className="text-xs text-gray-500 mb-3 font-medium">자사 지원금 정보</p>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs text-gray-500 mb-1">수수료 (원)</label>
-                <input type="number" value={form.commission} onChange={e => set('commission', Number(e.target.value))}
+                <input type="number" value={form.commission} onChange={e => setCommission(Number(e.target.value))}
                   className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                 />
               </div>
@@ -220,15 +250,25 @@ function ProductModal({
                   className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                 />
               </div>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">대손충당금 (원)</label>
-                <input type="number" value={form.bad_debt} onChange={e => set('bad_debt', Number(e.target.value))}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                />
-              </div>
             </div>
-            <div className={`mt-2 text-xs font-semibold ${room >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
-              룸 = 수수료 - 자사지원금 - 대손충당금 = {formatKRW(room)}원
+            <div className="mt-3">
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs text-gray-500">대손비용 (원)</label>
+                <button
+                  type="button"
+                  onClick={() => set('bad_debt', Math.round(form.commission * 0.05))}
+                  className="text-[10px] text-blue-500 hover:underline"
+                >
+                  5% 자동계산 ({formatKRW(Math.round(form.commission * 0.05))})
+                </button>
+              </div>
+              <input type="number" value={form.bad_debt} onChange={e => set('bad_debt', Number(e.target.value))}
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              />
+            </div>
+            <div className={`mt-3 px-3 py-2 rounded-lg text-xs font-semibold ${room > 0 ? 'bg-blue-50 text-blue-700' : 'bg-red-50 text-red-600'}`}>
+              공헌이익 = 수수료 − 자사지원금 − 대손비용 = {formatKRW(room)}원
+              {room <= 0 && ' ⚠️ 역마진'}
             </div>
           </div>
 
@@ -424,6 +464,23 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
     }
   }
 
+  async function handleSyncCommission() {
+    if (!confirm('수수료 시트에서 최신 수수료를 가져옵니다.\n키값이 설정된 상품의 수수료가 자동 업데이트됩니다. 계속하시겠습니까?')) return
+    setSyncing(true)
+    setSyncResult(null)
+    try {
+      const res = await fetch('/api/sync/commission', { method: 'POST' })
+      const json = await res.json()
+      if (json.error) throw new Error(json.error)
+      setSyncResult(`✓ 수수료 ${json.total}개 동기화 완료 · 상품 ${json.updated_products}개 업데이트`)
+      window.location.reload()
+    } catch (e) {
+      setSyncResult(`오류: ${e instanceof Error ? e.message : '알 수 없는 오류'}`)
+    } finally {
+      setSyncing(false)
+    }
+  }
+
   async function handleSyncAppliance() {
     if (!confirm('Redash에서 가전 상품 데이터를 가져옵니다.\n기존 가전 상품은 비활성화되고 새로 등록됩니다. 계속하시겠습니까?')) return
     setSyncing(true)
@@ -516,13 +573,22 @@ export function ProductsClient({ initialProducts }: { initialProducts: Product[]
           </div>
           <div className="flex items-center gap-2">
             {activeTab === 'tps' && (
-              <button
-                onClick={handleSyncTps}
-                disabled={syncing}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
-              >
-                {syncing ? '동기화 중...' : '↻ 시트 동기화'}
-              </button>
+              <>
+                <button
+                  onClick={handleSyncCommission}
+                  disabled={syncing}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  {syncing ? '동기화 중...' : '↻ 수수료 동기화'}
+                </button>
+                <button
+                  onClick={handleSyncTps}
+                  disabled={syncing}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {syncing ? '동기화 중...' : '↻ 시트 동기화'}
+                </button>
+              </>
             )}
             {activeTab === 'appliance' && (
               <button
